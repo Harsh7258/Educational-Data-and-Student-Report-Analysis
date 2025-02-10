@@ -56,7 +56,7 @@ This project is an **interactive data visualization dashboard** for **analyzing 
    - Displays **student performance, activity trends, and engagement metrics**.
 
    - ![Dashboard Preview](https://raw.githubusercontent.com/Harsh7258/EDA-Student-Report-Analysis/main/public/img/pic1.png)
-   - ![Dashboard Preview](public/img/pic2.png)
+   - ![Dashboard Preview](client/public/img/pic2.png)
 
 ---
 
@@ -68,7 +68,7 @@ This project is an **interactive data visualization dashboard** for **analyzing 
 ---
 
 ## Project Report (Major Project PDF)
- **Download Major Project Report (PDF):** [📄 Download Project Report](public/major_project_final_.pdf)
+ **Download Major Project Report (PDF):** [📄 Download Project Report](clent/public/major_project_final_.pdf)
 
 >  A detailed **project documentation PDF** will be available soon.
 
