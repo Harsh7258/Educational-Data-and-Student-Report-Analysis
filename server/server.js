@@ -18,7 +18,7 @@ app.get('/', async (req, res) => {
   res.json('server working');
 });
 
-app.use('/api/sheet-data', statisticsRoutes);
+app.use('/api/v1/sheet-data', statisticsRoutes);
 
 app.listen(PORT, () => {
     console.log(`server started: ${PORT}`);

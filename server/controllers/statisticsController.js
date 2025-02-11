@@ -78,78 +78,83 @@ const postSheetAnalysis = async (req, res) => {
       const { passRate, avgPerformance, attendanceRate, mostUsedCourse } =
         await calculateMetrics(sheetId, sheetName);
 
-        let existingSheet = await SheetIDandName.findOne({ sheetId, sheetName });
-        if (!existingSheet) {
-            try {
-                existingSheet = new SheetIDandName({ sheetId, sheetName });
-                await existingSheet.save();
-                console.log(`Successfully saved sheet details for ${sheetName} (${sheetId}) to the database.`);
-            } catch (error) {
-                console.error(`Error saving sheet details for ${sheetName} (${sheetId}):`, error.message || error);
-            }
-        } else {
-            console.log(`Sheet already exists: ${sheetName} (${sheetId})`);
-        }
+        const sheetEntry = await SheetIDandName.findOneAndUpdate({ sheetId, sheetName }, { sheetId, sheetName }, 
+          { upsert: true, new: true }
+        );
+    
+        console.log(`Sheet entry updated/created: ${sheetEntry.sheetName}`);
+    
+        // ✅ Step 3: Fetch Previous Data (or use defaults)
+        let previousData = await Previous.findOne({ sheetId, sheetName });
+    
 
-      let previousData = await Previous.findOne({ sheetId, sheetName });
-  
-      if (!previousData) {
-        previousData = new Previous({
-          sheetId,
-          sheetName,
-          passRate: 70,
-          avgPerformance: 75,
-          attendanceRate: 85,
-          coursePopularity: "N/A",
-          passRateIncrease: "N/A",
-          avgPerformanceIncrease: "N/A",
-          attendanceRateIncrease: "N/A",
-      });
-      await previousData.save();
-  
-      return res.json({
-        message: "Metrics initialized for the first time",
-          currentMetrics: {
-            passRate: `${passRate.toFixed(2)}%`,
-            avgPerformance: avgPerformance.toFixed(2),
-            attendanceRate: `${attendanceRate.toFixed(2)}%`,
-            coursePopularity: mostUsedCourse,
-        },
-          percentageIncreases: {
+        if (!previousData) {
+          previousData = new Previous({
+            sheetId,
+            sheetName,
+            passRate: 50,
+            avgPerformance: 65,
+            attendanceRate: 75,
+            coursePopularity: "N/A",
             passRateIncrease: "N/A",
             avgPerformanceIncrease: "N/A",
             attendanceRateIncrease: "N/A",
-        },
-      });
-    }
+          });
+          await previousData.save();
+    
+          return res.json({
+            message: "Metrics initialized for the first time",
+            currentMetrics: {
+              passRate: `${passRate.toFixed(2)}%`,
+              avgPerformance: avgPerformance.toFixed(2),
+              attendanceRate: `${attendanceRate.toFixed(2)}%`,
+              coursePopularity: mostUsedCourse,
+            },
+            percentageIncreases: {
+              passRateIncrease: "N/A",
+              avgPerformanceIncrease: "N/A",
+              attendanceRateIncrease: "N/A",
+            },
+          });
+        }
+    
+        const passRateIncrease = calcPercentageIncrease(passRate, previousData.passRate || 50);
+        const avgPerformanceIncrease = calcPercentageIncrease(avgPerformance, previousData.avgPerformance || 65);
+        const attendanceRateIncrease = calcPercentageIncrease(attendanceRate, previousData.attendanceRate || 75);
+    
+        previousData = await Previous.findOneAndUpdate(
+          { sheetId, sheetName },
+          {
+            sheetId,
+            sheetName,
+            passRate,
+            avgPerformance,
+            attendanceRate,
+            coursePopularity: mostUsedCourse,
+            passRateIncrease,
+            avgPerformanceIncrease,
+            attendanceRateIncrease,
+            lastUpdated: Date.now(),
+          },
+          { upsert: true, new: true }
+        );
+    
+        console.log(`Updated metrics for ${sheetName} (ID: ${sheetId})`);
 
-    const passRateIncrease = calcPercentageIncrease(passRate, previousData.passRate);
-    const avgPerformanceIncrease = calcPercentageIncrease(avgPerformance, previousData.avgPerformance);
-    const attendanceRateIncrease = calcPercentageIncrease(attendanceRate, previousData.attendanceRate);
-
-      previousData.passRate = passRate;
-      previousData.avgPerformance = avgPerformance;
-      previousData.attendanceRate = attendanceRate;
-      previousData.coursePopularity = mostUsedCourse;
-      previousData.passRateIncrease = passRateIncrease;
-      previousData.avgPerformanceIncrease = avgPerformanceIncrease;
-      previousData.attendanceRateIncrease = attendanceRateIncrease;
-      previousData.lastUpdated = Date.now();
-      await previousData.save();
-  
-      res.json({
-        currentMetrics: {
-          passRate: `${passRate.toFixed(2)}%`,
-          avgPerformance: avgPerformance.toFixed(2),
-          attendanceRate: `${attendanceRate.toFixed(2)}%`,
-          coursePopularity: mostUsedCourse,
-        },
-        percentageIncreases: {
-          passRateIncrease,
-          avgPerformanceIncrease,
-          attendanceRateIncrease,
-      },
-    });
+        res.json({
+          message: "Metrics updated successfully",
+          currentMetrics: {
+            passRate: `${passRate.toFixed(2)}`,
+            avgPerformance: avgPerformance.toFixed(2),
+            attendanceRate: `${attendanceRate.toFixed(2)}`,
+            coursePopularity: mostUsedCourse,
+          },
+          percentageIncreases: {
+            passRateIncrease,
+            avgPerformanceIncrease,
+            attendanceRateIncrease,
+          },
+        });
   } catch (error) {
     console.error("Error calculating metrics:", error.message || error);
     res.status(500).json({ error: "Failed to calculate metrics", details: error.message });
@@ -311,9 +316,9 @@ const updateMetricsForAllSheets = async () => {
           previousData = new Previous({
             sheetId,
             sheetName,
-            passRate: 70,
-            avgPerformance: 75,
-            attendanceRate: 85,
+            passRate: 50,
+            avgPerformance: 65,
+            attendanceRate: 75,
             coursePopularity: "N/A",
             passRateIncrease: "N/A",
             avgPerformanceIncrease: "N/A",
