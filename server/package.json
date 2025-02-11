@@ -1,0 +1,21 @@
+{
+  "name": "server",
+  "version": "1.0.0",
+  "description": "Educational Data Analysis and report major project ",
+  "main": "index.js",
+  "scripts": {
+    "start": "nodemon --no-deprecation  server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Mahima, Dhanraj, K. Harsh",
+  "license": "ISC",
+  "dependencies": {
+    "body-parser": "^1.20.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "googleapis": "^144.0.0",
+    "mongoose": "^8.9.3",
+    "node-cron": "^3.0.3"
+  }
+}
