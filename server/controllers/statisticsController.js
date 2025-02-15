@@ -284,6 +284,54 @@ const getSheetNames = async (req, res) => {
   }
 };
 
+// @desc    Sheet courses data
+// @route   GET /api/educational-data-sheet/course-statistics
+// @access  Public
+const getCourseStatistics = async (req, res) => {
+  try {
+    const { sheetId, sheetName } = req.query;
+
+    if (!sheetId || !sheetName) {
+      return res.status(400).json({ error: "Sheet ID and Sheet Name are required" });
+    }
+
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: sheetId,
+      range: `${sheetName}!A1:Z`, 
+    });
+
+    const rows = response.data.values;
+    if (!rows || rows.length === 0) {
+      return res.status(404).json({ 
+        error: "No data found in the sheet."
+      });
+    }
+
+    const headers = rows[0];
+    const courseColIndex = headers.findIndex((header) => header.includes("Course Name"));
+
+    if (courseColIndex === -1) {
+      return res.status(400).json({ error: `"Course Name" column not found in the sheet.` });
+    }
+
+    const courseNames = rows.slice(1).map((row) => row[courseColIndex] || "Unknown").filter(Boolean);
+    // console.log(courseNames)
+    const courseData = courseNames.reduce((acc, course) => {
+      acc[course] = (acc[course] || 0) + 1;
+      return acc;
+    }, {});
+    // console.log(courseData);
+
+    res.json({
+      success: "success",
+      data: { courseData }, 
+    });
+  } catch (error) {
+    console.error("Error fetching course statistics:", error.message);
+    res.status(500).json({ error: "Failed to fetch course statistics" });
+  }
+};
+
 // @desc    Update sheet analyzed data
 // @route   POST /api/educational-data-sheet/sheet-names
 // @access  Public
@@ -364,4 +412,4 @@ cron.schedule("0 0 1 * *", async () => {
 });
 
 
-module.exports = { postSheetNames, postSheetAnalysis, getStatistics, getSheetDataTable, getSheetNames };
+module.exports = { postSheetNames, postSheetAnalysis, getStatistics, getSheetDataTable, getSheetNames, getCourseStatistics };
