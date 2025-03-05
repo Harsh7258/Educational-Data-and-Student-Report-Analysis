@@ -68,7 +68,7 @@ This project is an **interactive data visualization dashboard** for **analyzing 
 ---
 
 ## Project Report (Major Project PDF)
- **Download Major Project Report (PDF):** [📄 Download Project Report](clent/public/major_project_final_.pdf)
+ **Download Major Project Report (PDF):** [📄 Download Project Report](cilent/public/major_project_final_.pdf)
 
 >  A detailed **project documentation PDF** will be available soon.
 
