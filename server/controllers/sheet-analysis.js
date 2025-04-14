@@ -105,6 +105,37 @@ const calcPercentageIncrease = (current, previous) => {
   return (((current - previous) / previous) * 100).toFixed(2) + "%";
 };
 
-module.exports = { calculateMetrics, calcPercentageIncrease, formatSheetData };
+const calculatePassFailRates = (quizScores) => {
+  const validScores = quizScores
+    .map(score => typeof score === 'string' ? parseFloat(score.trim()) : score)
+    .filter(score => !isNaN(score));
+
+  const totalStudents = validScores.length;
+  if (totalStudents === 0) return { passRate: 0, failRate: 0 };
+
+  // Use correct pass mark (you had 60 but comment said 40 — confirm it)
+  const passingScores = validScores.filter(score => score >= 40);
+
+  const passRate = (passingScores.length / totalStudents) * 100;
+  const failRate = 100 - passRate;
+
+  return {
+    passRate: passRate.toFixed(1),
+    failRate: failRate.toFixed(1),
+  };
+};
+
+const calculateAvgPerformance = (scores) => {
+  const total = scores.reduce((sum, val) => sum + val, 0);
+  const average = scores.length > 0 ? total / scores.length : 0;
+  return average.toFixed(1); 
+};
+
+module.exports = { calculateMetrics, 
+  calcPercentageIncrease, 
+  formatSheetData, 
+  calculatePassFailRates,
+  calculateAvgPerformance 
+};
 
 

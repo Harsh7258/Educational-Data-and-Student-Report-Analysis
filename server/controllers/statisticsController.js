@@ -1,8 +1,15 @@
 const { google } = require("googleapis")
 const cron = require("node-cron");
-const { formatSheetData, calculateMetrics, calcPercentageIncrease } = require("./sheet-analysis");
+const { formatSheetData, 
+  calculateMetrics, 
+  calcPercentageIncrease, 
+  calculatePassFailRates, 
+  calculateAvgPerformance
+} = require("./sheet-analysis");
 const Previous = require("../models/pervious.model");
 const SheetIDandName = require("../models/sheet.model");
+const QuizStats = require("../models/quizdata.model");
+const AvgPerformanceData = require("../models/avgperformance.model");
 
 const API_KEY = process.env.API_KEY;
 const sheets = google.sheets({ 
@@ -332,6 +339,195 @@ const getCourseStatistics = async (req, res) => {
   }
 };
 
+// @desc    Sheet quiz data analysis
+// @route   GET /api/educational-data-sheet/quiz-stats
+// @access  Public
+const getQuizStatistics = async (req, res) => {
+  try {
+    const { sheetId, sheetName } = req.query;
+
+    if (!sheetId || !sheetName) {
+      return res.status(400).json({ error: "Sheet ID and Sheet Name are required" });
+    }
+
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: sheetId,
+      range: `${sheetName}!A1:Z`,
+    });
+
+    const rows = response.data.values;
+    if (!rows || rows.length === 0) {
+      return res.status(404).json({ error: "No data found in the sheet." });
+    }
+
+    const headers = rows[0];
+    const quizColIndex = headers.findIndex((header) => header.toLowerCase().includes("quiz name"));
+    const scoreColIndex = headers.findIndex((header) => header.toLowerCase().includes("quiz score"));
+
+    if (quizColIndex === -1 || scoreColIndex === -1) {
+      return res.status(400).json({ error: `"Quiz Name" or "Quiz Score" column not found in the sheet.` });
+    }
+
+    const quizData = new Map();
+
+    rows.slice(1).forEach((row) => {
+      const originalQuizName = row[quizColIndex]?.trim();
+      const normalizedQuizName = originalQuizName?.toLowerCase();
+      // const score = parseFloat(row[scoreColIndex]) || 0;
+      const raw = row[scoreColIndex];
+      const score = raw ? parseFloat(raw.toString().trim().replace('%', '')) : NaN;
+
+      if (!normalizedQuizName) return;
+
+      if (!quizData.has(normalizedQuizName)) {
+        quizData.set(normalizedQuizName, { quizName: originalQuizName, scores: [] });
+      }
+
+      quizData.get(normalizedQuizName).scores.push(score);
+    });
+
+    const quizStatsArray = Array.from(quizData.values()).map(({ quizName, scores }) => {
+      const { passRate, failRate } = calculatePassFailRates(scores);
+      return { quizName, passRate, failRate };
+    });
+
+    const updatedDoc = await QuizStats.findOneAndUpdate(
+      { sheetId, sheetName },
+      {
+        stats: quizStatsArray,
+        lastUpdated: new Date(),
+      },
+      { upsert: true, new: true }
+    );
+
+    // console.log(updatedDoc)
+
+    res.json({ 
+      success: true, 
+      data: updatedDoc.stats 
+    });
+
+  } catch (error) {
+    console.error("Error fetching quiz statistics:", error.message);
+    res.status(500).json({ error: "Failed to fetch quiz statistics" });
+  }
+};
+
+const getAveragePerformance = async (req, res) => {
+  try {
+    const { sheetId, sheetName } = req.query;
+
+    if (!sheetId || !sheetName) {
+      return res.status(400).json({ error: "Sheet ID and Sheet Name are required" });
+    }
+
+    const response = await sheets.spreadsheets.values.get({
+      spreadsheetId: sheetId,
+      range: `${sheetName}!A1:Z`,
+    });
+
+    const rows = response.data.values;
+    if (!rows || rows.length < 2) {
+      return res.status(404).json({ error: "No data found in the sheet." });
+    }
+
+    const headers = rows[0];
+    const quizColIndex = headers.findIndex((h) => h.toLowerCase().includes("quiz name"));
+    const scoreColIndex = headers.findIndex((h) => h.toLowerCase().includes("quiz score"));
+
+    if (quizColIndex === -1 || scoreColIndex === -1) {
+      return res.status(400).json({ error: `"Quiz Name" or "Quiz Score" column not found in the sheet.` });
+    }
+
+    const quizMap = new Map();
+
+    rows.slice(1).forEach((row) => {
+      const rawQuizName = row[quizColIndex]?.trim();
+      const normalizedQuizName = rawQuizName?.toLowerCase(); 
+
+      const score = parseFloat(row[scoreColIndex]) || 0;
+
+      if (!normalizedQuizName) return;
+
+      if (!quizMap.has(normalizedQuizName)) {
+        quizMap.set(normalizedQuizName, {
+          quizName: rawQuizName, 
+          scores: [],
+        });
+      }
+
+      quizMap.get(normalizedQuizName).scores.push(score);
+    });
+
+    const transformAverageData = (map) =>
+      Array.from(map.values()).map(({ quizName, scores }) => {
+        const trimmedName = quizName.trim();
+        const normalizedName = trimmedName.toLowerCase();
+    
+        return {
+          quizName: trimmedName,
+          normalizedQuizName: normalizedName,
+          avgPerformance: calculateAvgPerformance(scores),
+        };
+      });
+
+    const averageData = transformAverageData(quizMap);
+    // console.log("average data: ", averageData);
+
+    const existingEntry = await AvgPerformanceData.findOne({ sheetId, sheetName });
+    const now = new Date();
+
+    if (!existingEntry) {
+      await AvgPerformanceData.create({
+        sheetId,
+        sheetName,
+        data: averageData.map((entry) => ({
+          quizName: entry.quizName.trim(),
+          normalizedQuizName: entry.quizName.toLowerCase().trim(),
+          avgPerformance: entry.avgPerformance,
+          previousAvgPerformance: 0,
+          lastUpdated: now,
+        })),
+      });
+    } else {
+      const updatedMap = new Map();
+
+      existingEntry.data.forEach((d) => {
+        const key = d.normalizedQuizName || d.quizName.toLowerCase().trim();
+        updatedMap.set(key, { ...d });
+      });
+
+      averageData.forEach((entry) => {
+        const normalizedName = entry.quizName.toLowerCase().trim();
+        const existing = updatedMap.get(normalizedName);
+
+        const updatedEntry = {
+          quizName: entry.quizName.trim(),
+          normalizedQuizName: normalizedName,
+          avgPerformance: entry.avgPerformance,
+          previousAvgPerformance: existing ? existing.avgPerformance : 0,
+          lastUpdated: now,
+        };
+
+        updatedMap.set(normalizedName, updatedEntry);
+      });
+
+      await AvgPerformanceData.updateOne(
+        { sheetId, sheetName },
+        { $set: { data: Array.from(updatedMap.values()) } }
+      );
+    }
+
+    res.status(200).json({
+      success: "success",
+      data: averageData,
+    });
+  } catch (error) {
+    console.error("Error calculating average performance:", error.message);
+    res.status(500).json({ error: "Failed to calculate average performance" });
+  }
+};
+
 // @desc    Update sheet analyzed data
 // @route   POST /api/educational-data-sheet/sheet-names
 // @access  Public
@@ -412,4 +608,12 @@ cron.schedule("0 0 1 * *", async () => {
 });
 
 
-module.exports = { postSheetNames, postSheetAnalysis, getStatistics, getSheetDataTable, getSheetNames, getCourseStatistics };
+module.exports = { postSheetNames, 
+  postSheetAnalysis, 
+  getStatistics, 
+  getSheetDataTable, 
+  getSheetNames, 
+  getCourseStatistics, 
+  getQuizStatistics ,
+  getAveragePerformance
+};
