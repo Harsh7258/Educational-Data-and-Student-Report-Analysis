@@ -16,7 +16,7 @@ export function Tables() {
   const fetchSheetData = async () => {
     if (!sheetId || !sheetName) return;
     try {
-      const response = await axios.get('http://localhost:5000/api/sheet-data/sheet-rows-data', {
+      const response = await axios.get('http://localhost:5000/api/v1/sheet-data/sheet-rows-data', {
         params: { sheetId, sheetName },
       });
       
