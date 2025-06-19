@@ -20,6 +20,7 @@ import {
   useMaterialTailwindController,
   setOpenSidenav,
 } from "@/context";
+import { fetchStatisticsCardsData } from "@/data";
 
 export function DashboardNavbar() {
   const [controller, dispatch] = useMaterialTailwindController();
@@ -27,8 +28,7 @@ export function DashboardNavbar() {
   const { pathname } = useLocation();
   const [layout, page] = pathname.split("/").filter((el) => el !== "");
   const [sheetUrl, setSheetUrl] = useState('');
-  const [sheetData, setSheetData] = useState(null);
-  const { sheetId, setSheetId, sheetName, setSheetName } = useSheet();
+  const { sheetId, setSheetId, sheetName, setSheetName,setStatisticsCards } = useSheet();
   const [sheetNames, setSheetNames] = useState([]);
 
   const extractSheetId = (url) => {
@@ -44,10 +44,10 @@ export function DashboardNavbar() {
       return;
     }
 
-    setSheetId(extractedSheetId); // Store the extracted Sheet ID
+    setSheetId(extractedSheetId); 
 
     try {
-      const response =  await axios.post('http://localhost:5000/api/sheet-data/sheet-names', { sheetId: extractedSheetId });
+      const response =  await axios.post('http://localhost:5000/api/v1/sheet-data/sheet-names', { sheetId: extractedSheetId });
       // console.log(response.data)
       const fetchedSheetNames = response.data.sheetName || [];
       
@@ -75,15 +75,16 @@ export function DashboardNavbar() {
     }
 
     try {
-      const response = await axios.post("http://localhost:5000/api/sheet-data/analyze-sheet", {
+      await axios.post("http://localhost:5000/api/v1/sheet-data/analyze-sheet", {
         sheetId,
         sheetName: sheetName, 
       });
 
-      setSheetData(response.data);
       // console.log(response.data);
+      const updatedData = await fetchStatisticsCardsData();
+      setStatisticsCards(updatedData);
     } catch (error) {
-      console.error("Error fetching sheet data:", error);
+      // console.error("Error fetching sheet data:", error);
       alert("Failed to fetch data.");
     }
   };
@@ -149,7 +150,7 @@ export function DashboardNavbar() {
               }`}
               value={sheetName}
               onChange={(e) => setSheetName(e.target.value)}
-              disabled={sheetNames.length === 0} // Disables dropdown when no sheets are available
+              disabled={sheetNames.length === 0} 
             >
               {sheetNames.length === 0 ? (
                 <option value="">No sheets</option>

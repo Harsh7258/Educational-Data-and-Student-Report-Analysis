@@ -1,6 +1,27 @@
 import { Routes, Route, Navigate } from "react-router-dom";
+import { Chart as ChartJs, 
+  ArcElement, 
+  Tooltip, 
+  Legend, 
+  BarElement, 
+  CategoryScale, 
+  LinearScale, 
+  LineElement,
+  PointElement,
+  Title } from "chart.js";
 import { SheetProvider } from "./context/SheetProvider";
 import { Dashboard, Auth } from "@/layouts";
+
+ChartJs.register(ArcElement, 
+  Tooltip, 
+  Legend, 
+  BarElement, 
+  CategoryScale, 
+  LinearScale, 
+  LineElement,
+  PointElement,
+  Title
+);
 
 function App() {
   return (
